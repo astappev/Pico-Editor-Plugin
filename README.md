@@ -6,20 +6,15 @@ Provides an online Markdown editor and file manager for Pico.
 Install
 -------
 
-1. Extract a copy the "PicoEditor" folder to your Pico install "plugins" folder
-   - or `git clone https://github.com/theshka/Pico-Editor-Plugin.git PicoEditor`
-2. Place the following in your `config/config.php` file
-```php
-// Pico Editor Configuration
-$config['PicoEditor'] = array(
-    'enabled'   => true,
-    'password'  => 'YOUR SHA-512 PASSWORD',
-    'url'       => 'custom-admin-url'
-);
+1. Extract a copy of the "PicoEditor" folder to your Pico install "plugins" folder
+   - or `git clone https://github.com/astappiev/pico-editor.git PicoEditor`
+2. Place the following in your `config/config.yml` file
+```yml
+# Pico Editor Configuration
+PicoEditor:
+    enabled: true
+    password: SHA512-HASHED-PASSWORD
+    url: editor-url
 ```
-3. Create your `SHA-512` hashed password (http://crypo.in.ua/tools/eng_sha512.php)
-4. Visit http://yoursite.com/?custom-admin-url and login
-5. Thats it :)
-
----
-Forked from: https://github.com/gilbitron/Pico-Editor-Plugin
+3. Create your `SHA-512` hashed password (https://sha512.online/) and replace in config
+4. Open `http://<your domain>/?editor-url` and login
