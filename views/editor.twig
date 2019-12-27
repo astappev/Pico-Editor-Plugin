@@ -36,7 +36,7 @@
         <script src="{{ base_url }}/plugins/PicoEditor/assets/epiceditor/js/epiceditor.min.js"></script>
         <script>
             $(document).ready(function () {
-
+                var editorUrl = '{{ editor_url | link }}';
                 var unsaved = false;
                 var ignoreKeyUp = false;
                 var editor = new EpicEditor({
@@ -94,7 +94,7 @@
                     e.preventDefault();
                     var title = prompt('Please enter a post title', '');
                     if (title != null && title !== '') {
-                        $.post('?admin/new', {title: title}, function (data) {
+                        $.post(editorUrl + '/new', {title: title}, function (data) {
                             if (data.error) {
                                 alert(data.error);
                             } else {
@@ -116,7 +116,7 @@
                     $(this).addClass('open');
 
                     var fileUrl = $(this).attr('data-url').replace('?', '');
-                    $.post('?admin/open', {file: fileUrl}, function (data) {
+                    $.post(editorUrl + '/open', {file: fileUrl}, function (data) {
                         $('#epiceditor').data('currentFile', fileUrl);
                         editor.importFile('epiceditor', data);
                         onAllChangesSaved();
@@ -126,7 +126,7 @@
                 // Save post
                 editor.on('save', function () {
                     $('#saving').text('Saving...').addClass('active');
-                    $.post('?admin/save', {
+                    $.post(editorUrl + '/save', {
                         file: $('#epiceditor').data('currentFile'),
                         content: editor.exportFile()
                     }, function (data) {
@@ -155,7 +155,7 @@
 
                     var li = $(this).parents('li');
                     var fileUrl = $(this).attr('data-url').replace('?', '');
-                    $.post('?admin/delete', {file: fileUrl}, function (data) {
+                    $.post(editorUrl + '/delete', {file: fileUrl}, function (data) {
                         li.remove();
                         $('#epiceditor').data('currentFile', '');
                         editor.importFile('epiceditor', '');

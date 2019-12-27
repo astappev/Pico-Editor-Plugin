@@ -118,23 +118,23 @@ class PicoEditor extends AbstractPicoPlugin
             $this->is_admin = true;
         }
         // are we looking for admin/new?
-        if ($url == 'admin/new') {
+        if ($url == $this->adminUrl . '/new') {
             $this->doNew();
         }
         // are we looking for admin/open?
-        if ($url == 'admin/open') {
+        if ($url == $this->adminUrl . '/open') {
             $this->doOpen();
         }
         // are we looking for admin/save?
-        if ($url == 'admin/save') {
+        if ($url == $this->adminUrl . '/save') {
             $this->doSave();
         }
         // are we looking for admin/delete?
-        if ($url == 'admin/delete') {
+        if ($url == $this->adminUrl . '/delete') {
             $this->doDelete();
         }
         // are we looking for admin/logout?
-        if ($url == 'admin/logout') {
+        if ($url == $this->adminUrl . '/logout') {
             $this->is_logout = true;
         }
     }
