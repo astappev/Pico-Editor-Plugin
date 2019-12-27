@@ -166,6 +166,9 @@ class PicoEditor extends AbstractPicoPlugin
             // override 404 header
             header($_SERVER['SERVER_PROTOCOL'] . ' 200 OK');
 
+            $loader = new Twig_Loader_Filesystem($this->plugin_path);
+            $this->getPico()->getTwig()->setLoader($loader);
+
             // customizable endpoint used in editor's template
             $twigVariables['editor_url'] = $this->adminUrl;
 
@@ -209,26 +212,12 @@ class PicoEditor extends AbstractPicoPlugin
     }
 
     /**
-     * Triggered when Pico registers the twig template engine
-     *
-     * @param Twig_Environment &$twig Twig instance
-     * @see Pico::getTwig()
-     *
-     */
-    public function onTwigRegistered(Twig_Environment &$twig)
-    {
-        // have twig look for templates in our plugin directory
-        $loader = new Twig_Loader_Filesystem($this->plugin_path);
-        $twig->setLoader($loader);
-    }
-
-    /**
      * Check the login status before manipulating files...
      */
     private function doCheckLogin()
     {
         if (!isset($_SESSION['pico_logged_in']) || !$_SESSION['pico_logged_in']) {
-            die(json_encode(array('error' => 'Error: Unathorized')));
+            die(json_encode(array('error' => 'Error: Unauthorized')));
         }
     }
 
