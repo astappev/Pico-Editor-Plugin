@@ -2,7 +2,7 @@
 <html lang="en" class="no-js">
 <head>
     <meta charset="utf-8"/>
-    <title>Pico Editor Login</title>
+    <title>Pico Editor Login - {{ site_title }}</title>
     <link rel="stylesheet" href="{{ base_url }}/plugins/PicoEditor/assets/PicoEditor.css" type="text/css"/>
     <meta name="robots" content="noindex, nofollow"/>
 </head>
@@ -16,7 +16,7 @@
             {% endif %}
             <br>
             <form id="login-form" class="form" method="post" action="">
-                <input type="password" name="password" id="password" placeholder="Password" autofocus/>
+                <input type="password" name="password" id="password" placeholder="Password" autofocus="autofocus"/>
                 <button type="submit" id="login-button" value="Login">Login</button>
             </form>
             <br><a href="{{ base_url }}">&larr; Back</a>

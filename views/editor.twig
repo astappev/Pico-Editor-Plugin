@@ -2,7 +2,7 @@
 <html lang="en" class="no-js">
 <head>
     <meta charset="utf-8"/>
-    <title>Pico Editor</title>
+    <title>Pico Editor - {{ site_title }}</title>
     <link rel="stylesheet" href="{{ base_url }}/plugins/PicoEditor/assets/PicoEditor.css" type="text/css"/>
     <meta name="robots" content="noindex, nofollow"/>
 </head>
@@ -42,19 +42,17 @@
                 var editor = new EpicEditor({
                     container: 'epiceditor',
                     basePath: '{{ base_url }}/plugins/PicoEditor/assets/epiceditor',
-                    clientSideStorage: false,
                     file: {
                         name: 'epiceditor',
                         defaultContent: '',
                         autoSave: 5000
                     },
                     theme: {
-                        base: '{{ base_url }}/plugins/PicoEditor/assets/epiceditor/themes/base/epiceditor.css',
-                        preview: '{{ base_url }}/plugins/PicoEditor/assets/epiceditor/themes/preview/github.css',
-                        editor: '{{ base_url }}/plugins/PicoEditor/assets/epiceditor/themes/editor/epic-light.css'
+                        base: '/css/epiceditor.css',
+                        editor: '/css/editor.css',
+                        preview: '/css/preview.css'
                     },
                     button: {
-                        preview: true,
                         fullscreen: false
                     },
                     focusOnLoad: true
