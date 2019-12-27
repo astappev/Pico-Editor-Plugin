@@ -38,6 +38,7 @@
             $(document).ready(function () {
 
                 var unsaved = false;
+                var ignoreKeyUp = false;
                 var editor = new EpicEditor({
                     container: 'epiceditor',
                     basePath: '{{ base_url }}/plugins/PicoEditor/assets/epiceditor',
@@ -59,10 +60,32 @@
                     focusOnLoad: true
                 }).load();
 
-                $(editor.getElement('editor')).on('keyup', function () {
-                    if (!unsaved) {
-                        unsaved = true;
-                        document.title += ' *';
+                function onUnsavedChanges() {
+                    unsaved = true;
+                    document.title += ' *';
+                    window.onbeforeunload = function () {
+                        return 'You have unsaved changes. Are you sure you want to leave this post?'
+                    }
+                }
+
+                function onAllChangesSaved() {
+                    unsaved = false;
+                    document.title = document.title.replace(' *', '');
+                    window.onbeforeunload = null;
+                }
+
+                $(editor.getElement('editor')).on('keyup', function (e) {
+                    if (e.keyCode === 17) {
+                        ignoreKeyUp = false;
+                    } else if (!ignoreKeyUp && !unsaved) {
+                        onUnsavedChanges();
+                    }
+                });
+
+                // for ignore keys with ctrl + [key]
+                $(editor.getElement('editor')).on('keydown', function (e) {
+                    if (e.keyCode === 17) {
+                        ignoreKeyUp = true;
                     }
                 });
 
@@ -70,7 +93,7 @@
                 $('.controls .new').on('click', function (e) {
                     e.preventDefault();
                     var title = prompt('Please enter a post title', '');
-                    if (title != null && title != '') {
+                    if (title != null && title !== '') {
                         $.post('?admin/new', {title: title}, function (data) {
                             if (data.error) {
                                 alert(data.error);
@@ -78,8 +101,7 @@
                                 $('.nav .post').removeClass('open');
                                 $('#epiceditor').data('currentFile', data.file);
                                 editor.importFile('epiceditor', data.content);
-                                unsaved = false;
-                                document.title = document.title.replace(' *', '');
+                                onAllChangesSaved();
                                 $('.nav').prepend('<li><a href="#" data-url="{{ base_url }}/' + data.file + '" class="post open"><span data-icon="3" aria-hidden="true"></span>' + data.title + '</a><a href="{{ base_url }}/' + data.file + '" target="_blank" class="view" title="View">5</a><a href="#" data-url="{{ base_url }}/' + data.file + '" class="delete" title="Delete">4</a></li>')
                             }
                         }, 'json');
@@ -97,30 +119,32 @@
                     $.post('?admin/open', {file: fileUrl}, function (data) {
                         $('#epiceditor').data('currentFile', fileUrl);
                         editor.importFile('epiceditor', data);
-                        unsaved = false;
-                        document.title = document.title.replace(' *', '');
+                        onAllChangesSaved();
                     });
                 });
 
                 // Save post
-                editor.on('autosave', function () {
+                editor.on('save', function () {
                     $('#saving').text('Saving...').addClass('active');
                     $.post('?admin/save', {
                         file: $('#epiceditor').data('currentFile'),
                         content: editor.exportFile()
                     }, function (data) {
                         $('#saving').text('Saved');
-                        unsaved = false;
-                        document.title = document.title.replace(' *', '');
+                        onAllChangesSaved();
                         setTimeout(function () {
                             $('#saving').removeClass('active');
                         }, 1000);
                     });
                 });
 
+                editor.on('autosave', function () {
+                    editor.emit('save');
+                });
+
                 // Save on preview
                 editor.on('preview', function () {
-                    editor.emit('autosave');
+                    editor.emit('save');
                 });
 
                 // Delete post
@@ -135,8 +159,7 @@
                         li.remove();
                         $('#epiceditor').data('currentFile', '');
                         editor.importFile('epiceditor', '');
-                        unsaved = false;
-                        document.title = document.title.replace(' *', '');
+                        onAllChangesSaved();
                     });
                 });
 
