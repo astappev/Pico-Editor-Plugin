@@ -13,7 +13,7 @@
   function _applyAttrs(context, attrs) {
     for (var attr in attrs) {
       if (attrs.hasOwnProperty(attr)) {
-        context[attr] = attrs[attr];
+        context.setAttribute(attr, attrs[attr]);
       }
     }
   }
@@ -101,7 +101,7 @@
   function _outerHeight(el) {
     var b = parseInt(_getStyle(el, 'border-top-width'), 10) + parseInt(_getStyle(el, 'border-bottom-width'), 10)
       , p = parseInt(_getStyle(el, 'padding-top'), 10) + parseInt(_getStyle(el, 'padding-bottom'), 10)
-      , w = el.offsetHeight
+      , w = parseInt(_getStyle(el, 'height'), 10)
       , t;
     // For IE in case no border is set and it defaults to "medium"
     if (isNaN(b)) { b = 0; }
@@ -165,28 +165,22 @@
   }
 
   function _setText(el, content) {
-    // If you want to know why we check for typeof string, see comment
-    // in the _getText function
-    if (typeof document.body.innerText == 'string') {
-      content = content.replace(/ /g, '\u00a0');
-      el.innerText = content;
-    }
-    else {
-      // Don't convert lt/gt characters as HTML when viewing the editor window
-      // TODO: Write a test to catch regressions for this
-      content = content.replace(/</g, '&lt;');
-      content = content.replace(/>/g, '&gt;');
-      content = content.replace(/\n/g, '<br>');
-      
-      // Make sure to there aren't two spaces in a row (replace one with &nbsp;)
-      // If you find and replace every space with a &nbsp; text will not wrap.
-      // Hence the name (Non-Breaking-SPace).
-      // TODO: Probably need to test this somehow...
-      content = content.replace(/<br>\s/g, '<br>&nbsp;')
-      content = content.replace(/\s\s\s/g, '&nbsp; &nbsp;')
-      content = content.replace(/\s\s/g, '&nbsp; ')
-      el.innerHTML = content;
-    }
+    // Don't convert lt/gt characters as HTML when viewing the editor window
+    // TODO: Write a test to catch regressions for this
+    content = content.replace(/</g, '&lt;');
+    content = content.replace(/>/g, '&gt;');
+    content = content.replace(/\n/g, '<br>');
+    
+    // Make sure to there aren't two spaces in a row (replace one with &nbsp;)
+    // If you find and replace every space with a &nbsp; text will not wrap.
+    // Hence the name (Non-Breaking-SPace).
+    // TODO: Probably need to test this somehow...
+    content = content.replace(/<br>\s/g, '<br>&nbsp;')
+    content = content.replace(/\s\s\s/g, '&nbsp; &nbsp;')
+    content = content.replace(/\s\s/g, '&nbsp; ')
+    content = content.replace(/^ /, '&nbsp;')
+
+    el.innerHTML = content;
     return true;
   }
 
@@ -355,9 +349,17 @@
           , toggleFullscreen: 'Enter Fullscreen'
           }
         , parser: typeof marked == 'function' ? marked : null
-        , button: { fullscreen: true, preview: true }
+        , autogrow: false
+        , button: { fullscreen: true
+          , preview: true
+          , bar: "auto"
+          }
         }
-      , defaultStorage;
+      , defaultStorage
+      , autogrowDefaults = { minHeight: 80
+        , maxHeight: false
+        , scroll: true
+        };
 
     self.settings = _mergeObjs(true, defaults, opts);
     
@@ -370,6 +372,16 @@
       self.settings.parser = function (str) {
         return str;
       }
+    }
+
+    if (self.settings.autogrow) {
+      if (self.settings.autogrow === true) {
+        self.settings.autogrow = autogrowDefaults;
+      }
+      else {
+        self.settings.autogrow = _mergeObjs(true, autogrowDefaults, self.settings.autogrow);
+      }
+      self._oldHeight = -1;
     }
 
     // If you put an absolute link as the path of any of the themes ignore the basePath
@@ -395,6 +407,16 @@
     else if (typeof self.settings.container == 'object') {
       self.element = self.settings.container;
     }
+
+    if (typeof self.settings.textarea == 'undefined' && typeof self.element != 'undefined') {
+      var textareas = self.element.getElementsByTagName('textarea');
+      if (textareas.length > 0) {
+        self.settings.textarea = textareas[0];
+        _applyStyles(self.settings.textarea, {
+          display: 'none'
+        });
+      }
+    }
     
     // Figure out the file name. If no file name is given we'll use the ID.
     // If there's no ID either we'll use a namespaced file name that's incremented
@@ -415,6 +437,14 @@
           self.settings.file.name = '__epiceditor-untitled-' + EpicEditor._data.unnamedEditors.length;
         }
       }
+    }
+
+    if (self.settings.button.bar === "show") {
+      self.settings.button.bar = true;
+    }
+
+    if (self.settings.button.bar === "hide") {
+      self.settings.button.bar = false;
     }
 
     // Protect the id and overwrite if passed in as an option
@@ -499,7 +529,8 @@
       , isMod = false
       , isCtrl = false
       , eventableIframes
-      , i; // i is reused for loops
+      , i // i is reused for loops
+      , boundAutogrow;
 
     // Startup is a way to check if this EpicEditor is starting up. Useful for
     // checking and doing certain things before EpicEditor emits a load event.
@@ -534,26 +565,33 @@
                   '<iframe frameborder="0" id="epiceditor-editor-frame"></iframe>' +
                   '<iframe frameborder="0" id="epiceditor-previewer-frame"></iframe>' +
                   '<div id="epiceditor-utilbar">' +
-                    (self._previewEnabled ? '<img width="30" src="' + this.settings.basePath + '/images/preview.png" title="' + this.settings.string.togglePreview + '" class="epiceditor-toggle-btn epiceditor-toggle-preview-btn"> ' : '') +
-                    (self._editEnabled ? '<img width="30" src="' + this.settings.basePath + '/images/edit.png" title="' + this.settings.string.toggleEdit + '" class="epiceditor-toggle-btn epiceditor-toggle-edit-btn"> ' : '') +
-                    (self._fullscreenEnabled ? '<img width="30" src="' + this.settings.basePath + '/images/fullscreen.png" title="' + this.settings.string.toggleFullscreen + '" class="epiceditor-fullscreen-btn">' : '') +
+                    (self._previewEnabled ? '<button title="' + this.settings.string.togglePreview + '" class="epiceditor-toggle-btn epiceditor-toggle-preview-btn"></button> ' : '') +
+                    (self._editEnabled ? '<button title="' + this.settings.string.toggleEdit + '" class="epiceditor-toggle-btn epiceditor-toggle-edit-btn"></button> ' : '') +
+                    (self._fullscreenEnabled ? '<button title="' + this.settings.string.toggleFullscreen + '" class="epiceditor-fullscreen-btn"></button>' : '') +
                   '</div>' +
                 '</div>'
     
     // The previewer is just an empty box for the generated HTML to go into
-    , previewer: '<div id="epiceditor-preview"></div>'
+    , previewer: '<div id="epiceditor-preview" class="epiceditor-preview"></div>'
+    , editor: '<!doctype HTML>'
     };
 
     // Write an iframe and then select it for the editor
-    self.element.innerHTML = '<iframe scrolling="no" frameborder="0" id= "' + self._instanceId + '"></iframe>';
+    iframeElement = document.createElement('iframe');
+    _applyAttrs(iframeElement, {
+      scrolling: 'no',
+      frameborder: 0,
+      id: self._instanceId
+    });
+    
+    
+    self.element.appendChild(iframeElement);
 
     // Because browsers add things like invisible padding and margins and stuff
     // to iframes, we need to set manually set the height so that the height
     // doesn't keep increasing (by 2px?) every time reflow() is called.
     // FIXME: Figure out how to fix this without setting this
     self.element.style.height = self.element.offsetHeight + 'px';
-
-    iframeElement = document.getElementById(self._instanceId);
     
     // Store a reference to the iframeElement itself
     self.iframeElement = iframeElement;
@@ -572,7 +610,7 @@
     self.editorIframeDocument = _getIframeInnards(self.editorIframe);
     self.editorIframeDocument.open();
     // Need something for... you guessed it, Firefox
-    self.editorIframeDocument.write('');
+    self.editorIframeDocument.write(_HtmlTemplates.editor);
     self.editorIframeDocument.close();
     
     // Setup the previewer iframe
@@ -662,16 +700,20 @@
 
     // TODO: Move into fullscreen setup function (_setupFullscreen)
     _elementStates = {}
-    self._goFullscreen = function (el) {
+    self._goFullscreen = function (el, callback) {
+      callback = callback || function () {};
+      var wait = 0;
+      this._fixScrollbars('auto');
 
       if (self.is('fullscreen')) {
-        self._exitFullscreen(el);
+        self._exitFullscreen(el, callback);
         return;
       }
 
       if (nativeFs) {
         if (nativeFsWebkit) {
           el.webkitRequestFullScreen();
+          wait = 750;
         }
         else if (nativeFsMoz) {
           el.mozRequestFullScreen();
@@ -683,85 +725,101 @@
 
       _isInEdit = self.is('edit');
 
-      // Set the state of EE in fullscreen
-      // We set edit and preview to true also because they're visible
-      // we might want to allow fullscreen edit mode without preview (like a "zen" mode)
-      self._eeState.fullscreen = true;
-      self._eeState.edit = true;
-      self._eeState.preview = true;
 
-      // Cache calculations
-      var windowInnerWidth = window.innerWidth
-        , windowInnerHeight = window.innerHeight
-        , windowOuterWidth = window.outerWidth
-        , windowOuterHeight = window.outerHeight;
+      // Why does this need to be in a randomly "750"ms setTimeout? WebKit's
+      // implementation of fullscreen seem to trigger the webkitfullscreenchange
+      // event _after_ everything is done. Instead, it triggers _during_ the
+      // transition. This means calculations of what's half, 100%, etc are wrong
+      // so to combat this we throw down the hammer with a setTimeout and wait
+      // to trigger our calculation code.
+      // See: https://code.google.com/p/chromium/issues/detail?id=181116
+      setTimeout(function () {
+        // Set the state of EE in fullscreen
+        // We set edit and preview to true also because they're visible
+        // we might want to allow fullscreen edit mode without preview (like a "zen" mode)
+        self._eeState.fullscreen = true;
+        self._eeState.edit = true;
+        self._eeState.preview = true;
 
-      // Without this the scrollbars will get hidden when scrolled to the bottom in faux fullscreen (see #66)
-      if (!nativeFs) {
-        windowOuterHeight = window.innerHeight;
-      }
+        // Cache calculations
+        var windowInnerWidth = window.innerWidth
+          , windowInnerHeight = window.innerHeight
+          , windowOuterWidth = window.outerWidth
+          , windowOuterHeight = window.outerHeight;
 
-      // This MUST come first because the editor is 100% width so if we change the width of the iframe or wrapper
-      // the editor's width wont be the same as before
-      _elementStates.editorIframe = _saveStyleState(self.editorIframe, 'save', {
-        'width': windowOuterWidth / 2 + 'px'
-      , 'height': windowOuterHeight + 'px'
-      , 'float': 'left' // Most browsers
-      , 'cssFloat': 'left' // FF
-      , 'styleFloat': 'left' // Older IEs
-      , 'display': 'block'
-      , 'position': 'static'
-      , 'left': ''
-      });
+        // Without this the scrollbars will get hidden when scrolled to the bottom in faux fullscreen (see #66)
+        if (!nativeFs) {
+          windowOuterHeight = window.innerHeight;
+        }
 
-      // the previewer
-      _elementStates.previewerIframe = _saveStyleState(self.previewerIframe, 'save', {
-        'width': windowOuterWidth / 2 + 'px'
-      , 'height': windowOuterHeight + 'px'
-      , 'float': 'right' // Most browsers
-      , 'cssFloat': 'right' // FF
-      , 'styleFloat': 'right' // Older IEs
-      , 'display': 'block'
-      , 'position': 'static'
-      , 'left': ''
-      });
+        // This MUST come first because the editor is 100% width so if we change the width of the iframe or wrapper
+        // the editor's width wont be the same as before
+        _elementStates.editorIframe = _saveStyleState(self.editorIframe, 'save', {
+          'width': windowOuterWidth / 2 + 'px'
+        , 'height': windowOuterHeight + 'px'
+        , 'float': 'left' // Most browsers
+        , 'cssFloat': 'left' // FF
+        , 'styleFloat': 'left' // Older IEs
+        , 'display': 'block'
+        , 'position': 'static'
+        , 'left': ''
+        });
 
-      // Setup the containing element CSS for fullscreen
-      _elementStates.element = _saveStyleState(self.element, 'save', {
-        'position': 'fixed'
-      , 'top': '0'
-      , 'left': '0'
-      , 'width': '100%'
-      , 'z-index': '9999' // Most browsers
-      , 'zIndex': '9999' // Firefox
-      , 'border': 'none'
-      , 'margin': '0'
-      // Should use the base styles background!
-      , 'background': _getStyle(self.editor, 'background-color') // Try to hide the site below
-      , 'height': windowInnerHeight + 'px'
-      });
+        // the previewer
+        _elementStates.previewerIframe = _saveStyleState(self.previewerIframe, 'save', {
+          'width': windowOuterWidth / 2 + 'px'
+        , 'height': windowOuterHeight + 'px'
+        , 'float': 'right' // Most browsers
+        , 'cssFloat': 'right' // FF
+        , 'styleFloat': 'right' // Older IEs
+        , 'display': 'block'
+        , 'position': 'static'
+        , 'left': ''
+        });
 
-      // The iframe element
-      _elementStates.iframeElement = _saveStyleState(self.iframeElement, 'save', {
-        'width': windowOuterWidth + 'px'
-      , 'height': windowInnerHeight + 'px'
-      });
+        // Setup the containing element CSS for fullscreen
+        _elementStates.element = _saveStyleState(self.element, 'save', {
+          'position': 'fixed'
+        , 'top': '0'
+        , 'left': '0'
+        , 'width': '100%'
+        , 'z-index': '9999' // Most browsers
+        , 'zIndex': '9999' // Firefox
+        , 'border': 'none'
+        , 'margin': '0'
+        // Should use the base styles background!
+        , 'background': _getStyle(self.editor, 'background-color') // Try to hide the site below
+        , 'height': windowInnerHeight + 'px'
+        });
 
-      // ...Oh, and hide the buttons and prevent scrolling
-      utilBtns.style.visibility = 'hidden';
+        // The iframe element
+        _elementStates.iframeElement = _saveStyleState(self.iframeElement, 'save', {
+          'width': windowOuterWidth + 'px'
+        , 'height': windowInnerHeight + 'px'
+        });
 
-      if (!nativeFs) {
-        document.body.style.overflow = 'hidden';
-      }
+        // ...Oh, and hide the buttons and prevent scrolling
+        utilBtns.style.visibility = 'hidden';
 
-      self.preview();
+        if (!nativeFs) {
+          document.body.style.overflow = 'hidden';
+        }
 
-      self.focus();
+        self.preview();
 
-      self.emit('fullscreenenter');
+        self.focus();
+
+        self.emit('fullscreenenter');
+
+        callback.call(self);
+      }, wait);
+
     };
 
-    self._exitFullscreen = function (el) {
+    self._exitFullscreen = function (el, callback) {
+      callback = callback || function () {};
+      this._fixScrollbars();
+
       _saveStyleState(self.element, 'apply', _elementStates.element);
       _saveStyleState(self.iframeElement, 'apply', _elementStates.iframeElement);
       _saveStyleState(self.editorIframe, 'apply', _elementStates.editorIframe);
@@ -806,6 +864,8 @@
       self.reflow();
 
       self.emit('fullscreenexit');
+
+      callback.call(self);
     };
 
     // This setups up live previews by triggering preview() IF in fullscreen on keyup
@@ -863,7 +923,9 @@
     utilBar = self.iframe.getElementById('epiceditor-utilbar');
 
     // Hide it at first until they move their mouse
-    utilBar.style.display = 'none';
+    if (self.settings.button.bar !== true) {
+      utilBar.style.display = 'none';
+    }
 
     utilBar.addEventListener('mouseover', function () {
       if (utilBarTimer) {
@@ -872,6 +934,9 @@
     });
 
     function utilBarHandler(e) {
+      if (self.settings.button.bar !== "auto") {
+        return;
+      }
       // Here we check if the mouse has moves more than 5px in any direction before triggering the mousemove code
       // we do this for 2 reasons:
       // 1. On Mac OS X lion when you scroll and it does the iOS like "jump" when it hits the top/bottom of the page itll fire off
@@ -896,6 +961,7 @@
     function shortcutHandler(e) {
       if (e.keyCode == self.settings.shortcut.modifier) { isMod = true } // check for modifier press(default is alt key), save to var
       if (e.keyCode == 17) { isCtrl = true } // check for ctrl/cmnd press, in order to catch ctrl/cmnd + s
+      if (e.keyCode == 18) { isCtrl = false }
 
       // Check for alt+p and make sure were not in fullscreen - default shortcut to switch to preview
       if (isMod === true && e.keyCode == self.settings.shortcut.preview && !self.is('fullscreen')) {
@@ -944,6 +1010,29 @@
       if (e.keyCode == 17) { isCtrl = false }
     }
 
+    function pasteHandler(e) {
+      var content;
+      if (e.clipboardData) {
+        //FF 22, Webkit, "standards"
+        e.preventDefault();
+        content = e.clipboardData.getData("text/plain");
+        self.editorIframeDocument.execCommand("insertText", false, content);
+      }
+      else if (window.clipboardData) {
+        //IE, "nasty"
+        e.preventDefault();
+        content = window.clipboardData.getData("Text");
+        content = content.replace(/</g, '&lt;');
+        content = content.replace(/>/g, '&gt;');
+        content = content.replace(/\n/g, '<br>');
+        content = content.replace(/\r/g, ''); //fuck you, ie!
+        content = content.replace(/<br>\s/g, '<br>&nbsp;')
+        content = content.replace(/\s\s\s/g, '&nbsp; &nbsp;')
+        content = content.replace(/\s\s/g, '&nbsp; ')
+        self.editorIframeDocument.selection.createRange().pasteHTML(content);
+      }
+    }
+
     // Hide and show the util bar based on mouse movements
     eventableIframes = [self.previewerIframeDocument, self.editorIframeDocument];
     
@@ -959,6 +1048,9 @@
       });
       eventableIframes[i].addEventListener('keydown', function (e) {
         shortcutHandler(e);
+      });
+      eventableIframes[i].addEventListener('paste', function (e) {
+        pasteHandler(e);
       });
     }
 
@@ -1021,6 +1113,34 @@
 
     self.iframe.close();
     self._eeState.startup = false;
+
+    if (self.settings.autogrow) {
+      self._fixScrollbars();
+
+      boundAutogrow = function () {
+        setTimeout(function () {
+          self._autogrow();
+        }, 1);
+      };
+
+      //for if autosave is disabled or very slow
+      ['keydown', 'keyup', 'paste', 'cut'].forEach(function (ev) {
+        self.getElement('editor').addEventListener(ev, boundAutogrow);
+      });
+      
+      self.on('__update', boundAutogrow);
+      self.on('edit', function () {
+        setTimeout(boundAutogrow, 50)
+      });
+      self.on('preview', function () {
+        setTimeout(boundAutogrow, 50)
+      });
+
+      //for browsers that have rendering delays
+      setTimeout(boundAutogrow, 50);
+      boundAutogrow();
+    }
+
     // The callback and call are the same thing, but different ways to access them
     callback.call(this);
     this.emit('load');
@@ -1029,7 +1149,6 @@
 
   EpicEditor.prototype._setupTextareaSync = function () {
     var self = this
-      , textareaFileName = self.settings.file.name
       , _syncTextarea;
 
     // Even if autoSave is false, we want to make sure to keep the textarea synced
@@ -1048,7 +1167,10 @@
       // This only happens for draft files. Probably has something to do with
       // the fact draft files haven't been saved by the time this is called.
       // TODO: Add test for this case.
-      self._textareaElement.value = self.exportFile(textareaFileName, 'text', true) || self.settings.file.defaultContent;
+      // Get the file.name each time as it can change. DO NOT save this to a
+      // var outside of this closure or the editor will stop syncing when the
+      // file is changed with importFile or open.
+      self._textareaElement.value = self.exportFile(self.settings.file.name, 'text', true) || self.settings.file.defaultContent;
     }
 
     if (typeof self.settings.textarea == 'string') {
@@ -1072,7 +1194,7 @@
     // If the developer wants drafts to be recoverable they should check if
     // the local file in localStorage's modified date is newer than the server.
     if (self._textareaElement.value !== '') {
-      self.importFile(textareaFileName, self._textareaElement.value);
+      self.importFile(self.settings.file.name, self._textareaElement.value);
 
       // manually save draft after import so there is no delay between the
       // import and exporting in _syncTextarea. Without this, _syncTextarea
@@ -1085,6 +1207,8 @@
 
     // Make sure to keep it updated
     self.on('__update', _syncTextarea);
+    self.on('__create', _syncTextarea);
+    self.on('__save', _syncTextarea);
   }
 
   /**
@@ -1124,7 +1248,6 @@
     callback = callback || function () {};
 
     if (self.settings.textarea) {
-      self._textareaElement.value = "";
       self.removeListener('__update');
     }
 
@@ -1256,9 +1379,13 @@
    * Puts the editor into fullscreen mode
    * @returns {object} EpicEditor will be returned
    */
-  EpicEditor.prototype.enterFullscreen = function () {
-    if (this.is('fullscreen')) { return this; }
-    this._goFullscreen(this.iframeElement);
+  EpicEditor.prototype.enterFullscreen = function (callback) {
+    callback = callback || function () {};
+    if (this.is('fullscreen')) {
+      callback.call(this);
+      return this;
+    }
+    this._goFullscreen(this.iframeElement, callback);
     return this;
   }
 
@@ -1266,9 +1393,13 @@
    * Closes fullscreen mode if opened
    * @returns {object} EpicEditor will be returned
    */
-  EpicEditor.prototype.exitFullscreen = function () {
-    if (!this.is('fullscreen')) { return this; }
-    this._exitFullscreen(this.iframeElement);
+  EpicEditor.prototype.exitFullscreen = function (callback) {
+    callback = callback || function () {};
+    if (!this.is('fullscreen')) {
+      callback.call(this);
+      return this;
+    }
+    this._exitFullscreen(this.iframeElement, callback);
     return this;
   }
 
@@ -1377,6 +1508,7 @@
     var self = this
       , storage
       , isUpdate = false
+      , isNew = false
       , file = self.settings.file.name
       , previewDraftName = ''
       , data = this._storage[previewDraftName + self.settings.localStorageName]
@@ -1398,6 +1530,7 @@
       // If the file doesn't exist we need to create it
       if (storage[file] === undefined) {
         storage[file] = self._defaultFileSchema();
+        isNew = true;
       }
 
       // If it does, we need to check if the content is different and
@@ -1414,10 +1547,17 @@
       storage[file].content = content;
       this._storage[previewDraftName + self.settings.localStorageName] = JSON.stringify(storage);
 
-      // After the content is actually changed, emit update so it emits the updated content
+      // If it's a new file, send a create event as well as a private one for
+      // use internally.
+      if (isNew) {
+        self.emit('create');
+        self.emit('__create');
+      }
+
+      // After the content is actually changed, emit update so it emits the
+      // updated content. Also send a private event for interal use.
       if (isUpdate) {
         self.emit('update');
-        // Emit a private update event so it can't get accidentally removed
         self.emit('__update');
       }
 
@@ -1426,6 +1566,7 @@
       }
       else if (!_isPreviewDraft) {
         this.emit('save');
+        self.emit('__save');
       }
     }
 
@@ -1479,30 +1620,28 @@
    * @returns {object} EpicEditor will be returned
    */
   EpicEditor.prototype.importFile = function (name, content, kind, meta) {
-    var self = this
-      , isNew = false;
+    var self = this;
 
     name = name || self.settings.file.name;
     content = content || '';
     kind = kind || 'md';
     meta = meta || {};
   
-    if (JSON.parse(this._storage[self.settings.localStorageName])[name] === undefined) {
-      isNew = true;
-    }
-
     // Set our current file to the new file and update the content
     self.settings.file.name = name;
     _setText(self.editor, content);
-
-    if (isNew) {
-      self.emit('create');
-    }
 
     self.save();
 
     if (self.is('fullscreen')) {
       self.preview();
+    }
+
+    //firefox has trouble with importing and working out the size right away
+    if (self.settings.autogrow) {
+      setTimeout(function () {
+        self._autogrow();
+      }, 50);
     }
 
     return this;
@@ -1557,6 +1696,9 @@
       return self.settings.parser(content);
     case 'text':
       return _sanitizeRawContent(content);
+    case 'json':
+      file.content = _sanitizeRawContent(file.content);
+      return JSON.stringify(file);
     case 'raw':
       return content;
     default:
@@ -1664,17 +1806,101 @@
     return self;
   }
 
-  EpicEditor.version = '0.2.1.1';
+  /**
+   * Handles autogrowing the editor
+   */
+  EpicEditor.prototype._autogrow = function () {
+    var editorHeight
+      , newHeight
+      , minHeight
+      , maxHeight
+      , el
+      , style
+      , maxedOut = false;
+
+    //autogrow in fullscreen is nonsensical
+    if (!this.is('fullscreen')) {
+      if (this.is('edit')) {
+        el = this.getElement('editor').documentElement;
+      }
+      else {
+        el = this.getElement('previewer').documentElement;
+      }
+
+      editorHeight = _outerHeight(el);
+      newHeight = editorHeight;
+
+      //handle minimum
+      minHeight = this.settings.autogrow.minHeight;
+      if (typeof minHeight === 'function') {
+        minHeight = minHeight(this);
+      }
+
+      if (minHeight && newHeight < minHeight) {
+        newHeight = minHeight;
+      }
+
+      //handle maximum
+      maxHeight = this.settings.autogrow.maxHeight;
+      if (typeof maxHeight === 'function') {
+        maxHeight = maxHeight(this);
+      }
+
+      if (maxHeight && newHeight > maxHeight) {
+        newHeight = maxHeight;
+        maxedOut = true;
+      }
+
+      if (maxedOut) {
+        this._fixScrollbars('auto');
+      } else {
+        this._fixScrollbars('hidden');
+      }
+
+      //actual resize
+      if (newHeight != this.oldHeight) {
+        this.getElement('container').style.height = newHeight + 'px';
+        this.reflow();
+        if (this.settings.autogrow.scroll) {
+          window.scrollBy(0, newHeight - this.oldHeight);
+        }
+        this.oldHeight = newHeight;
+      }
+    }
+  }
+
+  /**
+   * Shows or hides scrollbars based on the autogrow setting
+   * @param {string} forceSetting a value to force the overflow to
+   */
+  EpicEditor.prototype._fixScrollbars = function (forceSetting) {
+    var setting;
+    if (this.settings.autogrow) {
+      setting = 'hidden';
+    }
+    else {
+      setting = 'auto';
+    }
+    setting = forceSetting || setting;
+    this.getElement('editor').documentElement.style.overflow = setting;
+    this.getElement('previewer').documentElement.style.overflow = setting;
+  }
+
+  EpicEditor.version = '0.2.2';
 
   // Used to store information to be shared across editors
   EpicEditor._data = {};
 
-  window.EpicEditor = EpicEditor;
+  if (typeof window.define === 'function' && window.define.amd) {
+    window.define(function () { return EpicEditor; });
+  } else {
+    window.EpicEditor = EpicEditor;
+  }
 })(window);
 
 /**
  * marked - a markdown parser
- * Copyright (c) 2011-2013, Christopher Jeffrey. (MIT Licensed)
+ * Copyright (c) 2011-2014, Christopher Jeffrey. (MIT Licensed)
  * https://github.com/chjj/marked
  */
 
@@ -1691,13 +1917,13 @@ var block = {
   hr: /^( *[-*_]){3,} *(?:\n+|$)/,
   heading: /^ *(#{1,6}) *([^\n]+?) *#* *(?:\n+|$)/,
   nptable: noop,
-  lheading: /^([^\n]+)\n *(=|-){3,} *\n*/,
-  blockquote: /^( *>[^\n]+(\n[^\n]+)*\n*)+/,
-  list: /^( *)(bull) [\s\S]+?(?:hr|\n{2,}(?! )(?!\1bull )\n*|\s*$)/,
-  html: /^ *(?:comment|closed|closing) *(?:\n{2,}|\s*$)/,
-  def: /^ *\[([^\]]+)\]: *([^\s]+)(?: +["(]([^\n]+)[")])? *(?:\n+|$)/,
+  lheading: /^([^\n]+)\n *(=|-){2,} *(?:\n+|$)/,
+  blockquote: /^( *>[^\n]+(\n(?!def)[^\n]+)*\n*)+/,
+  list: /^( *)(bull) [\s\S]+?(?:hr|def|\n{2,}(?! )(?!\1bull )\n*|\s*$)/,
+  html: /^ *(?:comment *(?:\n|\s*$)|closed *(?:\n{2,}|\s*$)|closing *(?:\n{2,}|\s*$))/,
+  def: /^ *\[([^\]]+)\]: *<?([^\s>]+)>?(?: +["(]([^\n]+)[")])? *(?:\n+|$)/,
   table: noop,
-  paragraph: /^([^\n]+\n?(?!hr|heading|lheading|blockquote|tag|def))+\n*/,
+  paragraph: /^((?:[^\n]+\n?(?!hr|heading|lheading|blockquote|tag|def))+)\n*/,
   text: /^[^\n]+/
 };
 
@@ -1709,13 +1935,18 @@ block.item = replace(block.item, 'gm')
 
 block.list = replace(block.list)
   (/bull/g, block.bullet)
-  ('hr', /\n+(?=(?: *[-*_]){3,} *(?:\n+|$))/)
+  ('hr', '\\n+(?=\\1?(?:[-*_] *){3,}(?:\\n+|$))')
+  ('def', '\\n+(?=' + block.def.source + ')')
+  ();
+
+block.blockquote = replace(block.blockquote)
+  ('def', block.def)
   ();
 
 block._tag = '(?!(?:'
   + 'a|em|strong|small|s|cite|q|dfn|abbr|data|time|code'
   + '|var|samp|kbd|sub|sup|i|b|u|mark|ruby|rt|rp|bdi|bdo'
-  + '|span|br|wbr|ins|del|img)\\b)\\w+(?!:/|@)\\b';
+  + '|span|br|wbr|ins|del|img)\\b)\\w+(?!:/|[^\\w\\s@]*@)\\b';
 
 block.html = replace(block.html)
   ('comment', /<!--[\s\S]*?-->/)
@@ -1744,12 +1975,14 @@ block.normal = merge({}, block);
  */
 
 block.gfm = merge({}, block.normal, {
-  fences: /^ *(`{3,}|~{3,}) *(\w+)? *\n([\s\S]+?)\s*\1 *(?:\n+|$)/,
+  fences: /^ *(`{3,}|~{3,}) *(\S+)? *\n([\s\S]+?)\s*\1 *(?:\n+|$)/,
   paragraph: /^/
 });
 
 block.gfm.paragraph = replace(block.paragraph)
-  ('(?!', '(?!' + block.gfm.fences.source.replace('\\1', '\\2') + '|')
+  ('(?!', '(?!'
+    + block.gfm.fences.source.replace('\\1', '\\2') + '|'
+    + block.list.source.replace('\\1', '\\3') + '|')
   ();
 
 /**
@@ -1813,11 +2046,13 @@ Lexer.prototype.lex = function(src) {
  * Lexing
  */
 
-Lexer.prototype.token = function(src, top) {
+Lexer.prototype.token = function(src, top, bq) {
   var src = src.replace(/^ +$/gm, '')
     , next
     , loose
     , cap
+    , bull
+    , b
     , item
     , space
     , i
@@ -1934,7 +2169,7 @@ Lexer.prototype.token = function(src, top) {
       // Pass `top` to keep the current
       // "toplevel" state. This is exactly
       // how markdown.pl works.
-      this.token(cap, top);
+      this.token(cap, top, true);
 
       this.tokens.push({
         type: 'blockquote_end'
@@ -1946,10 +2181,11 @@ Lexer.prototype.token = function(src, top) {
     // list
     if (cap = this.rules.list.exec(src)) {
       src = src.substring(cap[0].length);
+      bull = cap[2];
 
       this.tokens.push({
         type: 'list_start',
-        ordered: isFinite(cap[2])
+        ordered: bull.length > 1
       });
 
       // Get each top-level item.
@@ -1976,12 +2212,22 @@ Lexer.prototype.token = function(src, top) {
             : item.replace(/^ {1,4}/gm, '');
         }
 
+        // Determine whether the next list item belongs here.
+        // Backpedal if it does not belong in this list.
+        if (this.options.smartLists && i !== l - 1) {
+          b = block.bullet.exec(cap[i + 1])[0];
+          if (bull !== b && !(bull.length > 1 && b.length > 1)) {
+            src = cap.slice(i + 1).join('\n') + src;
+            i = l - 1;
+          }
+        }
+
         // Determine whether item is loose or not.
         // Use: /(^|\n)(?! )[^\n]+\n\n(?!\s*$)/
         // for discount behavior.
         loose = next || /\n\n(?!\s*$)/.test(item);
         if (i !== l - 1) {
-          next = item[item.length-1] === '\n';
+          next = item.charAt(item.length - 1) === '\n';
           if (!loose) loose = next;
         }
 
@@ -1992,7 +2238,7 @@ Lexer.prototype.token = function(src, top) {
         });
 
         // Recurse.
-        this.token(item, false);
+        this.token(item, false, bq);
 
         this.tokens.push({
           type: 'list_item_end'
@@ -2013,14 +2259,14 @@ Lexer.prototype.token = function(src, top) {
         type: this.options.sanitize
           ? 'paragraph'
           : 'html',
-        pre: cap[1] === 'pre',
+        pre: cap[1] === 'pre' || cap[1] === 'script' || cap[1] === 'style',
         text: cap[0]
       });
       continue;
     }
 
     // def
-    if (top && (cap = this.rules.def.exec(src))) {
+    if ((!bq && top) && (cap = this.rules.def.exec(src))) {
       src = src.substring(cap[0].length);
       this.tokens.links[cap[1].toLowerCase()] = {
         href: cap[2],
@@ -2068,7 +2314,9 @@ Lexer.prototype.token = function(src, top) {
       src = src.substring(cap[0].length);
       this.tokens.push({
         type: 'paragraph',
-        text: cap[0]
+        text: cap[1].charAt(cap[1].length - 1) === '\n'
+          ? cap[1].slice(0, -1)
+          : cap[1]
       });
       continue;
     }
@@ -2098,7 +2346,7 @@ Lexer.prototype.token = function(src, top) {
  */
 
 var inline = {
-  escape: /^\\([\\`*{}\[\]()#+\-.!_>|])/,
+  escape: /^\\([\\`*{}\[\]()#+\-.!_>])/,
   autolink: /^<([^ >]+(@|:\/)[^ >]+)>/,
   url: noop,
   tag: /^<!--[\s\S]*?-->|^<\/?\w+(?:"[^"]*"|'[^']*'|[^'">])*?>/,
@@ -2107,14 +2355,14 @@ var inline = {
   nolink: /^!?\[((?:\[[^\]]*\]|[^\[\]])*)\]/,
   strong: /^__([\s\S]+?)__(?!_)|^\*\*([\s\S]+?)\*\*(?!\*)/,
   em: /^\b_((?:__|[\s\S])+?)_\b|^\*((?:\*\*|[\s\S])+?)\*(?!\*)/,
-  code: /^(`+)([\s\S]*?[^`])\1(?!`)/,
+  code: /^(`+)\s*([\s\S]*?[^`])\s*\1(?!`)/,
   br: /^ {2,}\n(?!\s*$)/,
   del: noop,
   text: /^[\s\S]+?(?=[\\<!\[_*`]| {2,}\n|$)/
 };
 
-inline._inside = /(?:\[[^\]]*\]|[^\]]|\](?=[^\[]*\]))*/;
-inline._href = /\s*<?([^\s]*?)>?(?:\s+['"]([\s\S]*?)['"])?\s*/;
+inline._inside = /(?:\[[^\]]*\]|[^\[\]]|\](?=[^\[]*\]))*/;
+inline._href = /\s*<?([\s\S]*?)>?(?:\s+['"]([\s\S]*?)['"])?\s*/;
 
 inline.link = replace(inline.link)
   ('inside', inline._inside)
@@ -2145,9 +2393,9 @@ inline.pedantic = merge({}, inline.normal, {
  */
 
 inline.gfm = merge({}, inline.normal, {
-  escape: replace(inline.escape)('])', '~])')(),
-  url: /^(https?:\/\/[^\s]+[^.,:;"')\]\s])/,
-  del: /^~{2,}([\s\S]+?)~{2,}/,
+  escape: replace(inline.escape)('])', '~|])')(),
+  url: /^(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/,
+  del: /^~~(?=\S)([\s\S]*?\S)~~/,
   text: replace(inline.text)
     (']|', '~]|')
     ('|', '|https?://|')
@@ -2171,6 +2419,8 @@ function InlineLexer(links, options) {
   this.options = options || marked.defaults;
   this.links = links;
   this.rules = inline.normal;
+  this.renderer = this.options.renderer || new Renderer;
+  this.renderer.options = this.options;
 
   if (!this.links) {
     throw new
@@ -2198,8 +2448,8 @@ InlineLexer.rules = inline;
  * Static Lexing/Compiling Method
  */
 
-InlineLexer.output = function(src, links, opt) {
-  var inline = new InlineLexer(links, opt);
+InlineLexer.output = function(src, links, options) {
+  var inline = new InlineLexer(links, options);
   return inline.output(src);
 };
 
@@ -2226,7 +2476,7 @@ InlineLexer.prototype.output = function(src) {
     if (cap = this.rules.autolink.exec(src)) {
       src = src.substring(cap[0].length);
       if (cap[2] === '@') {
-        text = cap[1][6] === ':'
+        text = cap[1].charAt(6) === ':'
           ? this.mangle(cap[1].substring(7))
           : this.mangle(cap[1]);
         href = this.mangle('mailto:') + text;
@@ -2234,29 +2484,26 @@ InlineLexer.prototype.output = function(src) {
         text = escape(cap[1]);
         href = text;
       }
-      out += '<a href="'
-        + href
-        + '">'
-        + text
-        + '</a>';
+      out += this.renderer.link(href, null, text);
       continue;
     }
 
     // url (gfm)
-    if (cap = this.rules.url.exec(src)) {
+    if (!this.inLink && (cap = this.rules.url.exec(src))) {
       src = src.substring(cap[0].length);
       text = escape(cap[1]);
       href = text;
-      out += '<a href="'
-        + href
-        + '">'
-        + text
-        + '</a>';
+      out += this.renderer.link(href, null, text);
       continue;
     }
 
     // tag
     if (cap = this.rules.tag.exec(src)) {
+      if (!this.inLink && /^<a /i.test(cap[0])) {
+        this.inLink = true;
+      } else if (this.inLink && /^<\/a>/i.test(cap[0])) {
+        this.inLink = false;
+      }
       src = src.substring(cap[0].length);
       out += this.options.sanitize
         ? escape(cap[0])
@@ -2267,10 +2514,12 @@ InlineLexer.prototype.output = function(src) {
     // link
     if (cap = this.rules.link.exec(src)) {
       src = src.substring(cap[0].length);
+      this.inLink = true;
       out += this.outputLink(cap, {
         href: cap[2],
         title: cap[3]
       });
+      this.inLink = false;
       continue;
     }
 
@@ -2281,61 +2530,55 @@ InlineLexer.prototype.output = function(src) {
       link = (cap[2] || cap[1]).replace(/\s+/g, ' ');
       link = this.links[link.toLowerCase()];
       if (!link || !link.href) {
-        out += cap[0][0];
+        out += cap[0].charAt(0);
         src = cap[0].substring(1) + src;
         continue;
       }
+      this.inLink = true;
       out += this.outputLink(cap, link);
+      this.inLink = false;
       continue;
     }
 
     // strong
     if (cap = this.rules.strong.exec(src)) {
       src = src.substring(cap[0].length);
-      out += '<strong>'
-        + this.output(cap[2] || cap[1])
-        + '</strong>';
+      out += this.renderer.strong(this.output(cap[2] || cap[1]));
       continue;
     }
 
     // em
     if (cap = this.rules.em.exec(src)) {
       src = src.substring(cap[0].length);
-      out += '<em>'
-        + this.output(cap[2] || cap[1])
-        + '</em>';
+      out += this.renderer.em(this.output(cap[2] || cap[1]));
       continue;
     }
 
     // code
     if (cap = this.rules.code.exec(src)) {
       src = src.substring(cap[0].length);
-      out += '<code>'
-        + escape(cap[2], true)
-        + '</code>';
+      out += this.renderer.codespan(escape(cap[2], true));
       continue;
     }
 
     // br
     if (cap = this.rules.br.exec(src)) {
       src = src.substring(cap[0].length);
-      out += '<br>';
+      out += this.renderer.br();
       continue;
     }
 
     // del (gfm)
     if (cap = this.rules.del.exec(src)) {
       src = src.substring(cap[0].length);
-      out += '<del>'
-        + this.output(cap[1])
-        + '</del>';
+      out += this.renderer.del(this.output(cap[1]));
       continue;
     }
 
     // text
     if (cap = this.rules.text.exec(src)) {
       src = src.substring(cap[0].length);
-      out += escape(cap[0]);
+      out += escape(this.smartypants(cap[0]));
       continue;
     }
 
@@ -2353,31 +2596,33 @@ InlineLexer.prototype.output = function(src) {
  */
 
 InlineLexer.prototype.outputLink = function(cap, link) {
-  if (cap[0][0] !== '!') {
-    return '<a href="'
-      + escape(link.href)
-      + '"'
-      + (link.title
-      ? ' title="'
-      + escape(link.title)
-      + '"'
-      : '')
-      + '>'
-      + this.output(cap[1])
-      + '</a>';
-  } else {
-    return '<img src="'
-      + escape(link.href)
-      + '" alt="'
-      + escape(cap[1])
-      + '"'
-      + (link.title
-      ? ' title="'
-      + escape(link.title)
-      + '"'
-      : '')
-      + '>';
-  }
+  var href = escape(link.href)
+    , title = link.title ? escape(link.title) : null;
+
+  return cap[0].charAt(0) !== '!'
+    ? this.renderer.link(href, title, this.output(cap[1]))
+    : this.renderer.image(href, title, escape(cap[1]));
+};
+
+/**
+ * Smartypants Transformations
+ */
+
+InlineLexer.prototype.smartypants = function(text) {
+  if (!this.options.smartypants) return text;
+  return text
+    // em-dashes
+    .replace(/--/g, '\u2014')
+    // opening singles
+    .replace(/(^|[-\u2014/(\[{"\s])'/g, '$1\u2018')
+    // closing singles & apostrophes
+    .replace(/'/g, '\u2019')
+    // opening doubles
+    .replace(/(^|[-\u2014/(\[{\u2018\s])"/g, '$1\u201c')
+    // closing doubles
+    .replace(/"/g, '\u201d')
+    // ellipses
+    .replace(/\.{3}/g, '\u2026');
 };
 
 /**
@@ -2402,6 +2647,149 @@ InlineLexer.prototype.mangle = function(text) {
 };
 
 /**
+ * Renderer
+ */
+
+function Renderer(options) {
+  this.options = options || {};
+}
+
+Renderer.prototype.code = function(code, lang, escaped) {
+  if (this.options.highlight) {
+    var out = this.options.highlight(code, lang);
+    if (out != null && out !== code) {
+      escaped = true;
+      code = out;
+    }
+  }
+
+  if (!lang) {
+    return '<pre><code>'
+      + (escaped ? code : escape(code, true))
+      + '\n</code></pre>';
+  }
+
+  return '<pre><code class="'
+    + this.options.langPrefix
+    + escape(lang, true)
+    + '">'
+    + (escaped ? code : escape(code, true))
+    + '\n</code></pre>\n';
+};
+
+Renderer.prototype.blockquote = function(quote) {
+  return '<blockquote>\n' + quote + '</blockquote>\n';
+};
+
+Renderer.prototype.html = function(html) {
+  return html;
+};
+
+Renderer.prototype.heading = function(text, level, raw) {
+  return '<h'
+    + level
+    + ' id="'
+    + this.options.headerPrefix
+    + raw.toLowerCase().replace(/[^\w]+/g, '-')
+    + '">'
+    + text
+    + '</h'
+    + level
+    + '>\n';
+};
+
+Renderer.prototype.hr = function() {
+  return this.options.xhtml ? '<hr/>\n' : '<hr>\n';
+};
+
+Renderer.prototype.list = function(body, ordered) {
+  var type = ordered ? 'ol' : 'ul';
+  return '<' + type + '>\n' + body + '</' + type + '>\n';
+};
+
+Renderer.prototype.listitem = function(text) {
+  return '<li>' + text + '</li>\n';
+};
+
+Renderer.prototype.paragraph = function(text) {
+  return '<p>' + text + '</p>\n';
+};
+
+Renderer.prototype.table = function(header, body) {
+  return '<table>\n'
+    + '<thead>\n'
+    + header
+    + '</thead>\n'
+    + '<tbody>\n'
+    + body
+    + '</tbody>\n'
+    + '</table>\n';
+};
+
+Renderer.prototype.tablerow = function(content) {
+  return '<tr>\n' + content + '</tr>\n';
+};
+
+Renderer.prototype.tablecell = function(content, flags) {
+  var type = flags.header ? 'th' : 'td';
+  var tag = flags.align
+    ? '<' + type + ' style="text-align:' + flags.align + '">'
+    : '<' + type + '>';
+  return tag + content + '</' + type + '>\n';
+};
+
+// span level renderer
+Renderer.prototype.strong = function(text) {
+  return '<strong>' + text + '</strong>';
+};
+
+Renderer.prototype.em = function(text) {
+  return '<em>' + text + '</em>';
+};
+
+Renderer.prototype.codespan = function(text) {
+  return '<code>' + text + '</code>';
+};
+
+Renderer.prototype.br = function() {
+  return this.options.xhtml ? '<br/>' : '<br>';
+};
+
+Renderer.prototype.del = function(text) {
+  return '<del>' + text + '</del>';
+};
+
+Renderer.prototype.link = function(href, title, text) {
+  if (this.options.sanitize) {
+    try {
+      var prot = decodeURIComponent(unescape(href))
+        .replace(/[^\w:]/g, '')
+        .toLowerCase();
+    } catch (e) {
+      return '';
+    }
+    if (prot.indexOf('javascript:') === 0 || prot.indexOf('vbscript:') === 0) {
+      return '';
+    }
+  }
+  var out = '<a href="' + href + '"';
+  if (title) {
+    out += ' title="' + title + '"';
+  }
+  out += '>' + text + '</a>';
+  return out;
+};
+
+Renderer.prototype.image = function(href, title, text) {
+  var out = '<img src="' + href + '" alt="' + text + '"';
+  if (title) {
+    out += ' title="' + title + '"';
+  }
+  out += this.options.xhtml ? '/>' : '>';
+  return out;
+};
+
+/**
  * Parsing & Compiling
  */
 
@@ -2409,14 +2797,17 @@ function Parser(options) {
   this.tokens = [];
   this.token = null;
   this.options = options || marked.defaults;
+  this.options.renderer = this.options.renderer || new Renderer;
+  this.renderer = this.options.renderer;
+  this.renderer.options = this.options;
 }
 
 /**
  * Static Parse Method
  */
 
-Parser.parse = function(src, options) {
-  var parser = new Parser(options);
+Parser.parse = function(src, options, renderer) {
+  var parser = new Parser(options, renderer);
   return parser.parse(src);
 };
 
@@ -2425,7 +2816,7 @@ Parser.parse = function(src, options) {
  */
 
 Parser.prototype.parse = function(src) {
-  this.inline = new InlineLexer(src.links, this.options);
+  this.inline = new InlineLexer(src.links, this.options, this.renderer);
   this.tokens = src.reverse();
 
   var out = '';
@@ -2449,7 +2840,7 @@ Parser.prototype.next = function() {
  */
 
 Parser.prototype.peek = function() {
-  return this.tokens[this.tokens.length-1] || 0;
+  return this.tokens[this.tokens.length - 1] || 0;
 };
 
 /**
@@ -2476,76 +2867,53 @@ Parser.prototype.tok = function() {
       return '';
     }
     case 'hr': {
-      return '<hr>\n';
+      return this.renderer.hr();
     }
     case 'heading': {
-      return '<h'
-        + this.token.depth
-        + '>'
-        + this.inline.output(this.token.text)
-        + '</h'
-        + this.token.depth
-        + '>\n';
+      return this.renderer.heading(
+        this.inline.output(this.token.text),
+        this.token.depth,
+        this.token.text);
     }
     case 'code': {
-      if (this.options.highlight) {
-        var code = this.options.highlight(this.token.text, this.token.lang);
-        if (code != null && code !== this.token.text) {
-          this.token.escaped = true;
-          this.token.text = code;
-        }
-      }
-
-      if (!this.token.escaped) {
-        this.token.text = escape(this.token.text, true);
-      }
-
-      return '<pre><code'
-        + (this.token.lang
-        ? ' class="lang-'
-        + this.token.lang
-        + '"'
-        : '')
-        + '>'
-        + this.token.text
-        + '</code></pre>\n';
+      return this.renderer.code(this.token.text,
+        this.token.lang,
+        this.token.escaped);
     }
     case 'table': {
-      var body = ''
-        , heading
+      var header = ''
+        , body = ''
         , i
         , row
         , cell
+        , flags
         , j;
 
       // header
-      body += '<thead>\n<tr>\n';
+      cell = '';
       for (i = 0; i < this.token.header.length; i++) {
-        heading = this.inline.output(this.token.header[i]);
-        body += this.token.align[i]
-          ? '<th align="' + this.token.align[i] + '">' + heading + '</th>\n'
-          : '<th>' + heading + '</th>\n';
+        flags = { header: true, align: this.token.align[i] };
+        cell += this.renderer.tablecell(
+          this.inline.output(this.token.header[i]),
+          { header: true, align: this.token.align[i] }
+        );
       }
-      body += '</tr>\n</thead>\n';
+      header += this.renderer.tablerow(cell);
 
-      // body
-      body += '<tbody>\n'
       for (i = 0; i < this.token.cells.length; i++) {
         row = this.token.cells[i];
-        body += '<tr>\n';
-        for (j = 0; j < row.length; j++) {
-          cell = this.inline.output(row[j]);
-          body += this.token.align[j]
-            ? '<td align="' + this.token.align[j] + '">' + cell + '</td>\n'
-            : '<td>' + cell + '</td>\n';
-        }
-        body += '</tr>\n';
-      }
-      body += '</tbody>\n';
 
-      return '<table>\n'
-        + body
-        + '</table>\n';
+        cell = '';
+        for (j = 0; j < row.length; j++) {
+          cell += this.renderer.tablecell(
+            this.inline.output(row[j]),
+            { header: false, align: this.token.align[j] }
+          );
+        }
+
+        body += this.renderer.tablerow(cell);
+      }
+      return this.renderer.table(header, body);
     }
     case 'blockquote_start': {
       var body = '';
@@ -2554,25 +2922,17 @@ Parser.prototype.tok = function() {
         body += this.tok();
       }
 
-      return '<blockquote>\n'
-        + body
-        + '</blockquote>\n';
+      return this.renderer.blockquote(body);
     }
     case 'list_start': {
-      var type = this.token.ordered ? 'ol' : 'ul'
-        , body = '';
+      var body = ''
+        , ordered = this.token.ordered;
 
       while (this.next().type !== 'list_end') {
         body += this.tok();
       }
 
-      return '<'
-        + type
-        + '>\n'
-        + body
-        + '</'
-        + type
-        + '>\n';
+      return this.renderer.list(body, ordered);
     }
     case 'list_item_start': {
       var body = '';
@@ -2583,9 +2943,7 @@ Parser.prototype.tok = function() {
           : this.tok();
       }
 
-      return '<li>'
-        + body
-        + '</li>\n';
+      return this.renderer.listitem(body);
     }
     case 'loose_item_start': {
       var body = '';
@@ -2594,24 +2952,19 @@ Parser.prototype.tok = function() {
         body += this.tok();
       }
 
-      return '<li>'
-        + body
-        + '</li>\n';
+      return this.renderer.listitem(body);
     }
     case 'html': {
-      return !this.token.pre && !this.options.pedantic
+      var html = !this.token.pre && !this.options.pedantic
         ? this.inline.output(this.token.text)
         : this.token.text;
+      return this.renderer.html(html);
     }
     case 'paragraph': {
-      return '<p>'
-        + this.inline.output(this.token.text)
-        + '</p>\n';
+      return this.renderer.paragraph(this.inline.output(this.token.text));
     }
     case 'text': {
-      return '<p>'
-        + this.parseText()
-        + '</p>\n';
+      return this.renderer.paragraph(this.parseText());
     }
   }
 };
@@ -2627,6 +2980,19 @@ function escape(html, encode) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function unescape(html) {
+  return html.replace(/&([#\w]+);/g, function(_, n) {
+    n = n.toLowerCase();
+    if (n === 'colon') return ':';
+    if (n.charAt(0) === '#') {
+      return n.charAt(1) === 'x'
+        ? String.fromCharCode(parseInt(n.substring(2), 16))
+        : String.fromCharCode(+n.substring(1));
+    }
+    return '';
+  });
 }
 
 function replace(regex, opt) {
@@ -2661,17 +3027,90 @@ function merge(obj) {
   return obj;
 }
 
+
 /**
  * Marked
  */
 
-function marked(src, opt) {
+function marked(src, opt, callback) {
+  if (callback || typeof opt === 'function') {
+    if (!callback) {
+      callback = opt;
+      opt = null;
+    }
+
+    opt = merge({}, marked.defaults, opt || {});
+
+    var highlight = opt.highlight
+      , tokens
+      , pending
+      , i = 0;
+
+    try {
+      tokens = Lexer.lex(src, opt)
+    } catch (e) {
+      return callback(e);
+    }
+
+    pending = tokens.length;
+
+    var done = function(err) {
+      if (err) {
+        opt.highlight = highlight;
+        return callback(err);
+      }
+
+      var out;
+
+      try {
+        out = Parser.parse(tokens, opt);
+      } catch (e) {
+        err = e;
+      }
+
+      opt.highlight = highlight;
+
+      return err
+        ? callback(err)
+        : callback(null, out);
+    };
+
+    if (!highlight || highlight.length < 3) {
+      return done();
+    }
+
+    delete opt.highlight;
+
+    if (!pending) return done();
+
+    for (; i < tokens.length; i++) {
+      (function(token) {
+        if (token.type !== 'code') {
+          return --pending || done();
+        }
+        return highlight(token.text, token.lang, function(err, code) {
+          if (err) return done(err);
+          if (code == null || code === token.text) {
+            return --pending || done();
+          }
+          token.text = code;
+          token.escaped = true;
+          --pending || done();
+        });
+      })(tokens[i]);
+    }
+
+    return;
+  }
   try {
+    if (opt) opt = merge({}, marked.defaults, opt);
     return Parser.parse(Lexer.lex(src, opt), opt);
   } catch (e) {
     e.message += '\nPlease report this to https://github.com/chjj/marked.';
     if ((opt || marked.defaults).silent) {
-      return 'An error occured:\n' + e.message;
+      return '<p>An error occured:</p><pre>'
+        + escape(e.message + '', true)
+        + '</pre>';
     }
     throw e;
   }
@@ -2683,7 +3122,7 @@ function marked(src, opt) {
 
 marked.options =
 marked.setOptions = function(opt) {
-  marked.defaults = opt;
+  merge(marked.defaults, opt);
   return marked;
 };
 
@@ -2693,8 +3132,14 @@ marked.defaults = {
   breaks: false,
   pedantic: false,
   sanitize: false,
+  smartLists: false,
   silent: false,
-  highlight: null
+  highlight: null,
+  langPrefix: 'lang-',
+  smartypants: false,
+  headerPrefix: '',
+  renderer: new Renderer,
+  xhtml: false
 };
 
 /**
@@ -2704,6 +3149,8 @@ marked.defaults = {
 marked.Parser = Parser;
 marked.parser = Parser.parse;
 
+marked.Renderer = Renderer;
+
 marked.Lexer = Lexer;
 marked.lexer = Lexer.lex;
 
@@ -2712,7 +3159,7 @@ marked.inlineLexer = InlineLexer.output;
 
 marked.parse = marked;
 
-if (typeof module !== 'undefined') {
+if (typeof module !== 'undefined' && typeof exports === 'object') {
   module.exports = marked;
 } else if (typeof define === 'function' && define.amd) {
   define(function() { return marked; });
