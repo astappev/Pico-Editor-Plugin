@@ -1,0 +1,22 @@
+{
+    "name": "astappiev/pico-editor",
+    "type": "pico-plugin",
+    "description": "Provides an online Markdown editor and file manager for Pico.",
+    "keywords": [ "pico", "picocms", "picocms-plugin", "pico-editor" ],
+    "homepage": "https://github.com/astappiev/pico-editor",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Contributors",
+            "homepage": "https://github.com/astappiev/pico-editor/graphs/contributors"
+        }
+    ],
+    "require": {
+        "php": ">=5.3.0",
+        "ext-json": "*",
+        "picocms/pico": "^2.1"
+    },
+    "autoload": {
+        "classmap": [ "PicoEditor.php", "lib/", "plugins/" ]
+    }
+}
