@@ -18,12 +18,12 @@
         <ul class="nav">
             {% for page in pages %}
                 <li>
-                    <a href="#" data-url="{{ page.url }}" class="post">
+                    <a href="#" data-id="{{ page.id }}" class="post">
                         <span data-icon="3" aria-hidden="true"></span>
                         {% if page.title %}{{ page.title }}{% else %}Untitled{% endif %}
                     </a>
                     <a href="{{ page.url }}" target="_blank" class="view" title="View">5</a>
-                    <a href="#" data-url="{{ page.url }}" class="delete" title="Delete">4</a>
+                    <a href="#" data-id="{{ page.id }}" class="delete" title="Delete">4</a>
                 </li>
             {% endfor %}
         </ul>
@@ -97,10 +97,10 @@
                                 alert(data.error);
                             } else {
                                 $('.nav .post').removeClass('open');
-                                $('#epiceditor').data('currentFile', data.file);
+                                $('#epiceditor').data('currentFile', data.id);
                                 editor.importFile('epiceditor', data.content);
                                 onAllChangesSaved();
-                                $('.nav').prepend('<li><a href="#" data-url="{{ base_url }}/' + data.file + '" class="post open"><span data-icon="3" aria-hidden="true"></span>' + data.title + '</a><a href="{{ base_url }}/' + data.file + '" target="_blank" class="view" title="View">5</a><a href="#" data-url="{{ base_url }}/' + data.file + '" class="delete" title="Delete">4</a></li>')
+                                $('.nav').prepend('<li><a href="#" data-id="' + data.id + '" class="post open"><span data-icon="3" aria-hidden="true"></span>' + data.title + '</a><a href="' + data.url + '" target="_blank" class="view" title="View">5</a><a href="#" data-id="' + data.id + '" class="delete" title="Delete">4</a></li>');
                             }
                         }, 'json');
                     }
@@ -113,9 +113,9 @@
                     $('.nav .post').removeClass('open');
                     $(this).addClass('open');
 
-                    var fileUrl = $(this).attr('data-url').replace('?', '');
-                    $.post(editorUrl + '/open', {file: fileUrl}, function (data) {
-                        $('#epiceditor').data('currentFile', fileUrl);
+                    var pageId = $(this).data('id');
+                    $.post(editorUrl + '/open', {pageId: pageId}, function (data) {
+                        $('#epiceditor').data('currentFile', pageId);
                         editor.importFile('epiceditor', data);
                         onAllChangesSaved();
                     });
@@ -123,17 +123,20 @@
 
                 // Save post
                 editor.on('save', function () {
-                    $('#saving').text('Saving...').addClass('active');
-                    $.post(editorUrl + '/save', {
-                        file: $('#epiceditor').data('currentFile'),
-                        content: editor.exportFile()
-                    }, function (data) {
-                        $('#saving').text('Saved');
-                        onAllChangesSaved();
-                        setTimeout(function () {
-                            $('#saving').removeClass('active');
-                        }, 1000);
-                    });
+                    var pageId = $('#epiceditor').data('currentFile');
+                    if (pageId) {
+                        $('#saving').text('Saving...').addClass('active');
+                        $.post(editorUrl + '/save', {
+                            pageId: pageId,
+                            content: editor.exportFile()
+                        }, function (data) {
+                            $('#saving').text('Saved');
+                            onAllChangesSaved();
+                            setTimeout(function () {
+                                $('#saving').removeClass('active');
+                            }, 1000);
+                        });
+                    }
                 });
 
                 editor.on('autosave', function () {
@@ -152,10 +155,10 @@
                     $('.nav .post').removeClass('open');
 
                     var li = $(this).parents('li');
-                    var fileUrl = $(this).attr('data-url').replace('?', '');
-                    $.post(editorUrl + '/delete', {file: fileUrl}, function (data) {
+                    var pageId = $(this).data('id');
+                    $.post(editorUrl + '/delete', {pageId: pageId}, function (data) {
                         li.remove();
-                        $('#epiceditor').data('currentFile', '');
+                        $('#epiceditor').removeData('currentFile');
                         editor.importFile('epiceditor', '');
                         onAllChangesSaved();
                     });
@@ -167,7 +170,6 @@
                     $('body,#main,#epiceditor').height($(window).height());
                     editor.reflow();
                 });
-
             });
         </script>
     </div>

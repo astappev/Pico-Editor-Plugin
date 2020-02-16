@@ -22,11 +22,6 @@ class PicoEditor extends AbstractPicoPlugin
     private $is_admin;
 
     /**
-     * logging out
-     */
-    private $is_logout;
-
-    /**
      * path to this plugin directory
      *
      * @see PicoEditor::onConfigLoaded()
@@ -34,28 +29,9 @@ class PicoEditor extends AbstractPicoPlugin
     private $plugin_path;
 
     /**
-     * content directory
-     *
-     * @see Pico::getConfig()
-     */
-    private $contentDir;
-
-    /**
-     * content file extension
-     *
-     * @see Pico::getConfig()
-     */
-    private $contentExt;
-
-    /**
      * Pico Editor password
      */
     private $password;
-
-    /**
-     * url rewriting enabled?
-     */
-    private $urlRewriting;
 
     /**
      * custom admin url
@@ -75,21 +51,8 @@ class PicoEditor extends AbstractPicoPlugin
     {
         // not seeking admin page
         $this->is_admin = false;
-        // not logging out
-        $this->is_logout = false;
         // path to the plugin, used for rendering templates
         $this->plugin_path = dirname(__FILE__);
-        // Pico's content dir
-        $this->contentDir = $config['content_dir'];
-        // Pico's content extention
-        $this->contentExt = $config['content_ext'];
-        // check config for url rewriting
-        if (isset($config['rewrite_url']) && !empty($config['rewrite_url']) &&
-            $config['rewrite_url'] == true) {
-            $this->urlRewriting = '/';
-        } else {
-            $this->urlRewriting = '/?';
-        }
         // check configuration for password
         if (isset($config['PicoEditor']['password']) && !empty($config['PicoEditor']['password'])) {
             $this->password = $config['PicoEditor']['password'];
@@ -109,33 +72,33 @@ class PicoEditor extends AbstractPicoPlugin
      *
      * @param string &$url part of the URL describing the requested contents
      * @see Pico::getRequestUrl()
-     *
      */
     public function onRequestUrl(&$url)
     {
         // are we looking for admin?
-        if ($url == $this->adminUrl) {
+        if (strpos($url, $this->adminUrl) === 0) {
             $this->is_admin = true;
-        }
-        // are we looking for admin/new?
-        if ($url == $this->adminUrl . '/new') {
-            $this->doNew();
-        }
-        // are we looking for admin/open?
-        if ($url == $this->adminUrl . '/open') {
-            $this->doOpen();
-        }
-        // are we looking for admin/save?
-        if ($url == $this->adminUrl . '/save') {
-            $this->doSave();
-        }
-        // are we looking for admin/delete?
-        if ($url == $this->adminUrl . '/delete') {
-            $this->doDelete();
-        }
-        // are we looking for admin/logout?
-        if ($url == $this->adminUrl . '/logout') {
-            $this->is_logout = true;
+
+            // are we looking for admin/new?
+            if ($url == $this->adminUrl . '/new') {
+                $this->doNew();
+            }
+            // are we looking for admin/open?
+            if ($url == $this->adminUrl . '/open') {
+                $this->doOpen();
+            }
+            // are we looking for admin/save?
+            if ($url == $this->adminUrl . '/save') {
+                $this->doSave();
+            }
+            // are we looking for admin/delete?
+            if ($url == $this->adminUrl . '/delete') {
+                $this->doDelete();
+            }
+            // are we looking for admin/logout?
+            if ($url == $this->adminUrl . '/logout') {
+                $this->doLogout();
+            }
         }
     }
 
@@ -144,24 +107,14 @@ class PicoEditor extends AbstractPicoPlugin
      *
      * @param string &$templateName file name of the template
      * @param array  &$twigVariables template variables
-     * @see DummyPlugin::onPageRendered()
-     * @throws Twig_Error_Loader
-     * @throws Twig_Error_Runtime
-     * @throws Twig_Error_Syntax
+     * @throws \Twig\Error\LoaderError
+     * @throws \Twig\Error\RuntimeError
+     * @throws \Twig\Error\SyntaxError
+     * @see  DummyPlugin::onPageRendered()
+     * @uses $_POST['password']
      */
     public function onPageRendering(&$templateName, array &$twigVariables)
     {
-        // LOGGING OUT
-        if ($this->is_logout) {
-            // destory the current session
-            session_destroy();
-            // redirect to the login page...
-            header('Location: ' . $twigVariables['base_url'] . $this->urlRewriting . $this->adminUrl);
-            // don't continue to render template
-            exit;
-        }
-
-        //LOGGING IN
         if ($this->is_admin) {
             // override 404 header
             header($_SERVER['SERVER_PROTOCOL'] . ' 200 OK');
@@ -170,6 +123,7 @@ class PicoEditor extends AbstractPicoPlugin
             $this->getPico()->getTwig()->setLoader($loader);
 
             // customizable endpoint used in editor's template
+            // $twigVariables['plugin_url'] = $this->pico->getBaseUrl() . '/plugins/' . basename(__DIR__);
             $twigVariables['editor_url'] = $this->adminUrl;
 
             // check if no password exists
@@ -177,10 +131,11 @@ class PicoEditor extends AbstractPicoPlugin
                 // set the error message
                 $twigVariables['login_error'] = 'No password set!';
                 // render the login view
-                echo $this->getPico()->getTwig()->render('views/login.twig', $twigVariables); // Render login.twig
+                echo $this->getPico()->getTwig()->render('views/login.twig', $twigVariables);
                 // don't continue to render template
                 exit;
             }
+
             // if no current session exists,
             if (!isset($_SESSION['pico_logged_in']) || !$_SESSION['pico_logged_in']) {
                 // check that user is POSTing a password
@@ -193,202 +148,216 @@ class PicoEditor extends AbstractPicoPlugin
                         // login failure
                         $twigVariables['login_error'] = 'Invalid password.';
                         // render the login view
-                        echo $this->getPico()->getTwig()->render('views/login.twig', $twigVariables); // Render login.twig
+                        echo $this->getPico()->getTwig()->render('views/login.twig', $twigVariables);
                         // don't continue to render template
                         exit;
                     }
                 } else {
                     // user did not submit a password.
-                    echo $this->getPico()->getTwig()->render('views/login.twig', $twigVariables); // Render login.twig
+                    echo $this->getPico()->getTwig()->render('views/login.twig', $twigVariables);
                     // don't continue to render template
                     exit;
                 }
             }
+
             // session exists, render the editor...
-            echo $this->getPico()->getTwig()->render('views/editor.twig', $twigVariables); // Render editor.twig
+            echo $this->getPico()->getTwig()->render('views/editor.twig', $twigVariables);
             // don't continue to render template
             exit;
         }
     }
 
     /**
-     * Check the login status before manipulating files...
+     * Exit from admin session
      */
-    private function doCheckLogin()
+    private function doLogout()
     {
-        if (!isset($_SESSION['pico_logged_in']) || !$_SESSION['pico_logged_in']) {
-            die(json_encode(array('error' => 'Error: Unauthorized')));
-        }
+        // destroy the current session
+        session_destroy();
+        // redirect to the login page...
+        header('Location: ' . $this->pico->getPageUrl($this->adminUrl));
+        // don't continue to render template
+        exit;
     }
 
     /**
-     * Create new file.
+     * Create a new page
      *
-     * @param void
-     * @return json/array the contents of the new file
+     * @uses $_POST['title']
      */
     private function doNew()
     {
-        /**
-         * TODO: Create new files in sub directories
-         */
+        $this->checkIfLoggedIn();
 
-        // check for logged in
-        $this->doCheckLogin();
         // sanitize post title
-        $title = isset($_POST['title']) && $_POST['title'] ? strip_tags($_POST['title']) : '';
+        $title = isset($_POST['title']) ? strip_tags($_POST['title']) : null;
+
         // get base name
-        $file = $this->slugify(basename($title));
-        // die if error...
-        if (!$file) {
-            die(json_encode(array('error' => 'Error: Invalid file name')));
+        $pageId = $this->slugify($title);
+
+        if (empty($title) || empty($pageId)) {
+            return $this->responseJson(['error' => 'Invalid page name.'], 400);
         }
-        // clear errors
-        $error = '';
-        // set file extension
-        $file .= $this->contentExt;
-        // the file content
-        $content = '---
-Title: ' . $title . '
-Description:
-Author:
-Date: ' . date('Y/m/d') . '
-Robots: noindex,nofollow
-Template:
----';
-        // check for duplicates
-        if (file_exists($this->contentDir . $file)) {
-            $error = 'Error: A post already exists with this title';
-        } else {
-            // save the file
-            file_put_contents($this->contentDir . $file, $content);
+
+        $pagePath = $this->getPagePath($pageId);
+        if (file_exists($pagePath)) {
+            return $this->responseJson(['error' => 'A page already exists with this name.'], 400);
         }
-        // return results
-        die(json_encode(array(
+
+        $content = "---\nTitle: " . $title . "\nDescription: \nAuthor: \n" .
+            "Date: " . date("Y/m/d") . "\nTemplate:\n---\n\n\n";
+
+        if (!file_put_contents($pagePath, $content)) {
+            return $this->responseJson(['error' => 'Can not create a file for new page.'], 400);
+        }
+
+        return $this->responseJson([
+            'id' => $pageId,
             'title' => $title,
             'content' => $content,
-            'file' => basename(str_replace($this->contentExt, '', $file)),
-            'error' => $error,
-        )));
+            'url' => $this->pico->getPageUrl($pageId),
+        ], 201);
     }
 
     /**
-     * Open a file.
+     * Load a page to editor
      *
-     * @param string $POST ['file'] the file to open
+     * @uses $_POST['pageId']
      */
     private function doOpen()
     {
-        /**
-         * TODO: Error when opening files that reside in a sub/folder; what is
-         * causing this, and how can it be fixed?
-         */
+        $this->checkIfLoggedIn();
+        $pageId = isset($_POST['pageId']) ? $_POST['pageId'] : null;
 
-        $this->doCheckLogin();
-        // check file url not blank
-        $file_url = isset($_POST['file']) && $_POST['file'] ? $_POST['file'] : '';
-        // get the base filename
-        $file = urldecode(basename($file_url));
-        // no file requested
-        if (!$file) {
-            die('Open Error: Invalid file ' . $file . ' at the URL: ' . $file_url);
-        }
-        // append the content extension
-        $file .= $this->contentExt;
-        // does the file exist, or die
-        if (file_exists($this->contentDir . $file)) {
-            // open the file
-            die(file_get_contents($this->contentDir . $file));
-        } else {
-            die('Open Error: Invalid file ' . $file . ' at the URL: ' . $file_url);
-        }
+        $pagePath = $this->getPagePath($pageId, true);
+
+        $content = file_get_contents($pagePath);
+        $this->responseText($content);
     }
 
     /**
      * Save changes to a file.
      *
-     * @param string $POST ['file'] the file to save
-     * @param string $POST ['contents'] the contents to save
+     * @uses $_POST['pageId']
+     * @uses $_POST['content']
      */
     private function doSave()
     {
-        /**
-         * TODO: save files that reside in sub directories
-         */
+        $this->checkIfLoggedIn();
+        $pageId = isset($_POST['pageId']) ? $_POST['pageId'] : null;
+        $content = isset($_POST['content']) ? $_POST['content'] : null;
 
-        $this->doCheckLogin();
-        // check file url not blank
-        $file_url = isset($_POST['file']) && $_POST['file'] ? $_POST['file'] : '';
-        // get the base filename
-        $file = urldecode(basename($file_url));
-        // no file requested
-        if (!$file) {
-            die('Save Error: Invalid file');
+        $pagePath = $this->getPagePath($pageId, true);
+
+        if (empty($content)) {
+            return $this->responseJson(['error' => 'Empty content given.'], 400);
         }
-        // no content sent
-        $content = isset($_POST['content']) && $_POST['content'] ? $_POST['content'] : '';
-        if (!$content) {
-            die('Save Error: Invalid content');
+
+        if (!file_put_contents($pagePath, $content)) {
+            return $this->responseJson(['error' => 'Unable to write changes to file.'], 400);
         }
-        // append the content extension
-        $file .= $this->contentExt;
-        // save the file
-        file_put_contents($this->contentDir . $file, $content);
-        // show the saved contents
-        die($content);
+
+        return $this->responseJson([]);
     }
 
     /**
-     * Delete a file.
+     * Delete a page.
      *
-     * @param string $POST ['file'] the file to delete
+     * @uses $_POST['pageId']
      */
     private function doDelete()
     {
-        /**
-         * TODO: delete files that reside in sub directories
-         */
+        $this->checkIfLoggedIn();
+        $pageId = isset($_POST['pageId']) ? $_POST['pageId'] : null;
 
-        $this->doCheckLogin();
-        // check file url not blank
-        $file_url = isset($_POST['file']) && $_POST['file'] ? $_POST['file'] : '';
-        // get the base filename
-        $file = urldecode(basename($file_url));
-        // no file was requested
-        if (!$file) {
-            die('Delete Error: Invalid file');
-        }
-        // append the content extension
-        $file .= $this->contentExt;
-        // if file exists,
-        if (file_exists($this->contentDir . $file)) {
-            // delete the file
-            die(unlink($this->contentDir . $file));
-        }
+        $pagePath = $this->getPagePath($pageId, true);
+
+        unlink($pagePath);
+        return $this->responseJson([]);
     }
 
     /**
-     * Create a url-friendly post slug
+     * Check the login status before manipulating files...
      *
-     * @param string &$output contents which will be sent to the user
+     * @uses $_SESSION['pico_logged_in']
+     */
+    private function checkIfLoggedIn()
+    {
+        if (!isset($_SESSION['pico_logged_in']) || !$_SESSION['pico_logged_in']) {
+            return $this->responseJson(['error' => 'Unauthorized'], 401);
+        }
+    }
+
+    private function getPagePath($pageId, $ensureExists = false)
+    {
+        if (empty($pageId)) {
+            return $this->responseJson(['error' => 'Empty page ID given.'], 400);
+        }
+
+        $pagePath = $this->pico->resolveFilePath($pageId);
+
+        if ($ensureExists) {
+            if (!file_exists($pagePath)) {
+                return $this->responseJson(['error' => 'Missing file ' . $pagePath . ' for page: ' . $pageId], 400);
+            }
+        }
+
+        return $pagePath;
+    }
+
+    /**
+     * Converts a title of a page to a slug (filename)
+     *
+     * @param string $text
+     * @return string a url-friendly post slug
      */
     private function slugify($text)
     {
         // replace non letter or digits by -
-        $text = preg_replace('~[^\\pL\d]+~u', '-', $text);
+        $text = preg_replace('~[^\pL\d/]+~u', '-', $text);
         // trim
         $text = trim($text, '-');
-        // transliterate
+        // convert to ascii
         $text = iconv('utf-8', 'us-ascii//TRANSLIT', $text);
         // lowercase
         $text = strtolower($text);
-        // remove unwanted characters
-        $text = preg_replace('~[^-\w]+~', '', $text);
+        // remove non[ascii text] characters
+        $text = preg_replace('~[^-\w/]+~', '', $text);
         // in case of empty text
         if (empty($text)) {
             return 'n-a';
         }
         // return result
         return $text;
+    }
+
+    /**
+     * Return $text as plain text and stop script
+     *
+     * @param string $text
+     * @param int $code
+     */
+    private function responseText($text, $code = 200)
+    {
+        header_remove();
+        http_response_code($code);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo $text;
+        exit;
+    }
+
+    /**
+     * Return $data as serialized json and stop script
+     *
+     * @param array $data
+     * @param int $code
+     */
+    private function responseJson($data, $code = 200)
+    {
+        header_remove();
+        http_response_code($code);
+        header('Content-Type: application/json');
+        echo json_encode($data);
+        exit;
     }
 }
