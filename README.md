@@ -1,10 +1,22 @@
-Pico Editor Plugin
-==================
+# Pico Editor Plugin
 
-Provides an online Markdown editor and file manager for Pico.
+Provides an online Markdown editor and file manager for Pico CMS.
 
-Install
--------
+This is a fork of [theshka/Pico-Editor-Plugin](https://github.com/theshka/Pico-Editor-Plugin) which is also fork of [gilbitron/Pico-Editor-Plugin](https://github.com/gilbitron/Pico-Editor-Plugin).
+
+## Features
+- Works with the latest version of Pico CMS (as of now)
+- Tree-like website structure
+- Edit pages
+- Manage pages
+    * create file (page)
+    * create subfolder
+    * create file in subfolder
+    * edit title (rename)
+    * delete file
+- Password protected access with customizable URL
+
+## Install
 
 1. Extract a copy of the "PicoEditor" folder to your Pico install "plugins" folder
    - or `git clone https://github.com/astappiev/pico-editor.git PicoEditor`
