@@ -18,7 +18,8 @@ This is a fork of [theshka/Pico-Editor-Plugin](https://github.com/theshka/Pico-E
 
 ## Install
 1. Extract a copy of the plugin into your Pico "plugins" folder (should be plugins/PicoEditor/PicoEditor.php)
-   - or `cd plugins` and `git clone https://github.com/astappiev/pico-editor.git PicoEditor`
+   - via Composer `composer require astappiev/pico-editor dev-master`
+   - or `cd plugins && git clone https://github.com/astappiev/pico-editor.git PicoEditor`
 2. Open `http://<your domain>/?editor`, update password (check [Configuration](#configuration) or follow instruction on the page) and login
 
 ## Configuration

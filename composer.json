@@ -22,6 +22,6 @@
         "picocms/pico": "^2.1"
     },
     "autoload": {
-        "classmap": [ "PicoEditor.php", "assets/", "views/" ]
+        "classmap": [ "PicoEditor.php" ]
     }
 }
