@@ -7,19 +7,29 @@
     <meta name="robots" content="noindex, nofollow"/>
 </head>
 <body>
-    <div class="wrapper" id="login">
-        <div class="container">
-            {% if login_error %}
-                <h1 class="error">{{ login_error }}</h1>
-            {% else %}
-                <h1>Pico Editor Login</h1>
-            {% endif %}
-            <br>
-            <form id="login-form" class="form" method="post" action="">
-                <input type="password" name="password" id="password" placeholder="Password" autofocus="autofocus"/>
-                <button type="submit" id="login-button" value="Login">Login</button>
-            </form>
-            <br><a href="{{ base_url }}">&larr; Back</a>
+    <div id="login">
+        <div class="wrapper">
+            <div class="container">
+                <div class="intro">
+                    {% if login_error %}
+                        <h1 class="error">{{ login_error }}</h1>
+                        {% if login_error == 'No password set!' %}
+                            <p>You should add your password to configuration file <code>config/config.yml</code>.</p>
+                            <pre># PicoEditor Password
+PicoEditor.password: SHA512-HASHED-PASSWORD</pre>
+                            <p>NOTE: The plugin is using `SHA-512` hash of your password instead of raw password<br/> (you can use <a href="https://sha512.online/" target="_blank">this website</a> or any other tool to create it).</p>
+                        {% endif %}
+                    {% else %}
+                        <h1>Pico Editor Login</h1>
+                    {% endif %}
+                </div>
+                <br>
+                <form id="login-form" class="form" method="post" action="">
+                    <input type="password" name="password" id="password" placeholder="Password" autofocus="autofocus"/>
+                    <button type="submit" id="login-button" value="Login">Login</button>
+                </form>
+                <br><a href="{{ base_url }}">&larr; Back</a>
+            </div>
         </div>
     </div>
 </body>

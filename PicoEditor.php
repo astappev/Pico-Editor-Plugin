@@ -17,11 +17,6 @@ class PicoEditor extends AbstractPicoPlugin
     const API_VERSION = 3;
 
     /**
-     * login status
-     */
-    private $is_admin;
-
-    /**
      * path to this plugin directory
      *
      * @see PicoEditor::onConfigLoaded()
@@ -29,14 +24,19 @@ class PicoEditor extends AbstractPicoPlugin
     private $plugin_path;
 
     /**
-     * Pico Editor password
+     * {@code true} if requested page belongs to PicoEditor
+     */
+    private $is_admin;
+
+    /**
+     * PicoEditor password
      */
     private $password;
 
     /**
-     * custom admin url
+     * PicoEditor url
      */
-    private $adminUrl;
+    private $adminUrl = 'editor';
 
     /**
      * Triggered after Pico has read its configuration
@@ -54,10 +54,16 @@ class PicoEditor extends AbstractPicoPlugin
         // path to the plugin, used for rendering templates
         $this->plugin_path = dirname(__FILE__);
         // check configuration for password
+        if (isset($config['PicoEditor.password']) && !empty($config['PicoEditor.password'])) {
+            $this->password = $config['PicoEditor.password'];
+        }
         if (isset($config['PicoEditor']['password']) && !empty($config['PicoEditor']['password'])) {
             $this->password = $config['PicoEditor']['password'];
         }
         // check configuration for custom admin url
+        if (isset($config['PicoEditor.url']) && !empty($config['PicoEditor.url'])) {
+            $this->adminUrl = $config['PicoEditor.url'];
+        }
         if (isset($config['PicoEditor']['url']) && !empty($config['PicoEditor']['url'])) {
             $this->adminUrl = $config['PicoEditor']['url'];
         }
@@ -76,7 +82,7 @@ class PicoEditor extends AbstractPicoPlugin
     public function onRequestUrl(&$url)
     {
         // are we looking for admin?
-        if (strpos($url, $this->adminUrl) === 0) {
+        if (!empty($this->adminUrl) && strpos($url, $this->adminUrl) === 0) {
             $this->is_admin = true;
 
             // are we looking for admin/new?

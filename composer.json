@@ -11,6 +11,11 @@
             "homepage": "https://github.com/astappiev/pico-editor/graphs/contributors"
         }
     ],
+    "support": {
+        "docs": "https://github.com/astappiev/pico-editor",
+        "issues": "https://github.com/astappiev/pico-editor/issues",
+        "source": "https://github.com/astappiev/pico-editor"
+    },
     "require": {
         "php": ">=5.3.6",
         "ext-json": "*",

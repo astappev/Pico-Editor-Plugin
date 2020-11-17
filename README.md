@@ -9,24 +9,24 @@ This is a fork of [theshka/Pico-Editor-Plugin](https://github.com/theshka/Pico-E
 - Tree-like website structure
 - Edit pages
 - Manage pages
-    * create file (page)
-    * create subfolder
-    * create file in subfolder
-    * edit title (rename)
-    * delete file
+    * create a file (page)
+    * create a sub-folder
+    * create a file in a sub-folder
+    * edit title of the file (rename)
+    * delete a file
 - Password protected access with customizable URL
 
 ## Install
+1. Extract a copy of the plugin into your Pico "plugins" folder (should be plugins/PicoEditor/PicoEditor.php)
+   - or `cd plugins` and `git clone https://github.com/astappiev/pico-editor.git PicoEditor`
+2. Open `http://<your domain>/?editor`, update password (check [Configuration](#configuration) or follow instruction on the page) and login
 
-1. Extract a copy of the "PicoEditor" folder to your Pico install "plugins" folder
-   - or `git clone https://github.com/astappiev/pico-editor.git PicoEditor`
-2. Place the following in your `config/config.yml` file
+## Configuration
+The configuration can be specified in `config/config.yml`
 ```yml
 # Pico Editor Configuration
 PicoEditor:
-    enabled: true
-    password: SHA512-HASHED-PASSWORD
-    url: editor-url
+    enabled: true                           # Force the plugin to be enabled or disabled
+    password: SHA512-HASHED-PASSWORD        # You have to use your own password (you should use hash, not raw password! https://sha512.online/)
+    url: editor                             # You can change editor url
 ```
-3. Create your `SHA-512` hashed password (https://sha512.online/) and replace in config
-4. Open `http://<your domain>/?editor-url` and login

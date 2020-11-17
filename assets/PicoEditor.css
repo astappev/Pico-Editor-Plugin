@@ -98,6 +98,11 @@ label {
 
 /* Main Styles
 /*---------------------------------------------*/
+html,
+body {
+    height: 100%;
+}
+
 body {
     font: 14px/1.8em 'Open Sans', Helvetica, Arial, Helvetica, sans-serif;
     color: #222;
@@ -117,56 +122,26 @@ a:hover, a:active {
     text-decoration: none;
 }
 
-.wrapper {
-    background: #707070;
-    position: absolute;
-    top: 50%;
-    left: 0;
-    width: 100%;
-    height: 300px;
-    margin-top: -200px;
-    overflow: hidden;
+code,
+pre {
+    font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
 }
 
-.wrapper.form-success .container h1 {
-    transform: translateY(85px);
+code {
+    font-size: 87.5%;
+    color: #fffb00;
+    word-break: break-word;
 }
 
-.container {
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 80px 0;
-    height: 400px;
-    text-align: center;
+pre {
+    display: block;
+    font-size: 87.5%;
+    color: #212529;
+    text-align: left;
 }
 
-.container h1 {
-    font-size: 40px;
-    transition-duration: 1s;
-    transition-timing-function: ease-in-out;
-    font-weight: 200;
-}
-
-.btn {
-    display: inline-block;
-    line-height: 20px;
-    padding: 1px 5px;
-    border: 1px solid #9EA1A5;
-    background: #f9f9fa;
-    background: linear-gradient(to bottom, #ffffff 1%, #f9f9fa 20%, #dee0e2 100%);
-    border-radius: 3px;
-}
-
-.btn:hover {
-    color: #111;
-	border-color: #111;
-}
-
-.btn:active {
-    position: relative;
-    top: 1px;
-}
-
+/* Sidebar Styles
+/*---------------------------------------------*/
 #sidebar {
     background: #fff;
     position: absolute;
@@ -178,6 +153,26 @@ a:hover, a:active {
     height: 100%;
     overflow: auto;
     border-right: 1px solid #DCE0E3;
+}
+
+#sidebar .btn {
+    display: inline-block;
+    line-height: 20px;
+    padding: 1px 5px;
+    border: 1px solid #9EA1A5;
+    background: #f9f9fa;
+    background: linear-gradient(to bottom, #ffffff 1%, #f9f9fa 20%, #dee0e2 100%);
+    border-radius: 3px;
+}
+
+#sidebar .btn:hover {
+    color: #111;
+    border-color: #111;
+}
+
+#sidebar .btn:active {
+    position: relative;
+    top: 1px;
 }
 
 #sidebar .controls {
@@ -305,8 +300,39 @@ a:hover, a:active {
 
 /* Login Styles
 /*---------------------------------------------*/
-#login .container h1 {
+#login {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#login .wrapper {
+    width: 100%;
+    background: #707070;
     color: #fff;
+}
+
+#login .container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 80px 0;
+    text-align: center;
+}
+
+#login a,
+#login a:visited {
+    color: #2eae9b;
+}
+
+#login .intro pre {
+    background: #fff;
+    border-radius: 3px;
+    padding: 5px 14px;
+}
+
+#login .intro h1 {
+    font-size: 40px;
+    margin-bottom: 16px;
 }
 
 #login-form form {
@@ -327,7 +353,7 @@ a:hover, a:active {
     display: block;
     text-align: center;
     font-size: 18px;
-    color: white;
+    color: #2eae9b;
     transition-duration: 0.25s;
     font-weight: 300;
 }
